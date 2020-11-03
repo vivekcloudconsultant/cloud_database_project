@@ -1,0 +1,387 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Metadata:
+
+  'AWS::CloudFormation::Interface':
+
+    ParameterGroups:
+
+    - Label:
+
+        default: 'Parent Stacks'
+
+      Parameters:
+
+      - ParentVPCStack
+
+      - ParentClientStack
+
+      - ParentKmsKeyStack
+
+      - ParentZoneStack
+
+      - ParentSSHBastionStack
+
+      - ParentAlertStack
+
+    - Label:
+
+        default: 'RDS Parameters'
+
+      Parameters:
+
+      - Engine
+
+      - DBSnapshotIdentifier
+
+      - DBInstanceClass
+
+      - DBName
+
+      - DBBackupRetentionPeriod
+
+      - DBMasterUsername
+
+      - DBMasterUserPassword
+
+      - SubDomainNameWithDot
+
+      - ReadSubDomainNameWithDot
+
+      - PreferredBackupWindow
+
+      - PreferredMaintenanceWindow
+
+Parameters:
+
+  ParentVPCStack:
+
+    Description: 'Stack name of parent VPC stack based on vpc/vpc-*azs.yaml template.'
+
+    Type: String
+
+  ParentClientStack:
+
+    Description: 'Stack name of parent client stack based on state/client-sg.yaml template.'
+
+    Type: String
+
+  ParentKmsKeyStack:
+
+    Description: 'Optional Stack name of parent KMS key stack based on security/kms-key.yaml template (ignored when DBSnapshotIdentifier is set, value used from snapshot).'
+
+    Type: String
+
+    Default: ''
+
+  ParentZoneStack:
+
+    Description: 'Optional stack name of parent zone stack based on vpc/vpc-zone-*.yaml template.'
+
+    Type: String
+
+    Default: ''
+
+  ParentSSHBastionStack:
+
+    Description: 'Optional but recommended stack name of parent SSH bastion host/instance stack based on vpc/vpc-*-bastion.yaml template.'
+
+    Type: String
+
+    Default: ''
+
+  ParentAlertStack:
+
+    Description: 'Optional but recommended stack name of parent alert stack based on operations/alert.yaml template.'
+
+    Type: String
+
+    Default: ''
+
+  Engine:
+
+    Description: 'Aurora engine and version'
+
+    Type: String
+
+    AllowedValues:
+
+    - '5.6.mysql-aurora.1.19.1' # aws rds describe-db-engine-versions --engine aurora --query 'DBEngineVersions[?contains(SupportedEngineModes,`provisioned`)].EngineVersion'
+
+    - aurora
+
+    - '5.7.mysql-aurora.2.04.3' # aws rds describe-db-engine-versions --engine aurora-mysql --query 'DBEngineVersions[?contains(SupportedEngineModes,`provisioned`)].EngineVersion'
+
+    - '5.7.mysql-aurora.2.03.4'
+
+    - 'aurora-mysql'
+
+    - 'aurora-postgresql-10.7' # aws rds describe-db-engine-versions --engine aurora-postgresql --query 'DBEngineVersions[?contains(SupportedEngineModes,`provisioned`)].EngineVersion'
+
+    - 'aurora-postgresql-10.6'
+
+    - 'aurora-postgresql-10.5'
+
+    - 'aurora-postgresql-10.4'
+
+    - 'aurora-postgresql-9.6.12'
+
+    - 'aurora-postgresql'
+
+    Default: aurora
+
+  DBSnapshotIdentifier:
+
+    Description: 'Optional identifier for the DB cluster snapshot from which you want to restore (leave blank to create an empty cluster).'
+
+    Type: String
+
+    Default: ''
+
+  DBInstanceClass:
+
+    Description: 'The instance type of database server (see https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.DBInstanceClass.html).'
+
+    Type: String
+
+    Default: 'db.t2.small'
+
+  DBName:
+
+    Description: 'Name of the database (ignored when DBSnapshotIdentifier is set, value used from snapshot).'
+
+    Type: String
+
+    Default: ''
+
+  DBBackupRetentionPeriod:
+
+    Description: 'The number of days to keep snapshots of the cluster.'
+
+    Type: Number
+
+    MinValue: 1
+
+    MaxValue: 35
+
+    Default: 30
+
+  DBMasterUsername:
+
+    Description: 'The master user name for the DB instance (ignored when DBSnapshotIdentifier is set, value used from snapshot).'
+
+    Type: 'String'
+
+    Default: master
+
+  DBMasterUserPassword:
+
+    Description: 'The master password for the DB instance (ignored when DBSnapshotIdentifier is set, value used from snapshot).'
+
+    Type: String
+
+    NoEcho: true
+
+    Default: ''
+
+  SubDomainNameWithDot:
+
+    Description: 'Name that is used to create the DNS entry with trailing dot, e.g. ?{SubDomainNameWithDot}?{HostedZoneName}. Leave blank for naked (or apex and bare) domain. Requires ParentZoneStack parameter!'
+
+    Type: String
+
+    Default: 'aurora.'
+
+  ReadSubDomainNameWithDot:
+
+    Description: 'Name that is used to create the read DNS entry with trailing dot, e.g. ?{SubDomainNameWithDot}?{HostedZoneName}. Leave blank for naked (or apex and bare) domain. Requires ParentZoneStack parameter!'
+
+    Type: String
+
+    Default: 'read-aurora.'
+
+  PreferredBackupWindow:
+
+    Description: 'The daily time range in UTC during which you want to create automated backups.'
+
+    Type: String
+
+    Default: '09:54-10:24'
+
+  PreferredMaintenanceWindow:
+
+    Description: The weekly time range (in UTC) during which system maintenance can occur.
+
+    Type: String
+
+    Default: 'sat:07:00-sat:07:30'
+
+Mappings:
+
+  EngineMap:
+
+    aurora:
+
+      Engine: aurora
+
+      EngineVersion: '5.6.10a'
+
+      Port: 3306
+
+      ClusterParameterGroupFamily: 'aurora5.6'
+
+      ParameterGroupFamily: 'aurora5.6'
+
+    '5.6.mysql-aurora.1.19.1':
+
+      Engine: aurora
+
+      EngineVersion: '5.6.mysql_aurora.1.19.1'
+
+      Port: 3306
+
+      ClusterParameterGroupFamily: 'aurora5.6'
+
+      ParameterGroupFamily: 'aurora5.6'
+
+    'aurora-mysql':
+
+      Engine: 'aurora-mysql'
+
+      EngineVersion: '5.7.12'
+
+      Port: 3306
+
+      ClusterParameterGroupFamily: 'aurora-mysql5.7'
+
+      ParameterGroupFamily: 'aurora-mysql5.7'
+
+    '5.7.mysql-aurora.2.03.4':
+
+      Engine: 'aurora-mysql'
+
+      EngineVersion: '5.7.mysql_aurora.2.03.4'
+
+      Port: 3306
+
+      ClusterParameterGroupFamily: 'aurora-mysql5.7'
+
+      ParameterGroupFamily: 'aurora-mysql5.7'
+
+    '5.7.mysql-aurora.2.04.3':
+
+      Engine: 'aurora-mysql'
+
+      EngineVersion: '5.7.mysql_aurora.2.04.3'
+
+      Port: 3306
+
+      ClusterParameterGroupFamily: 'aurora-mysql5.7'
+
+      ParameterGroupFamily: 'aurora-mysql5.7'
+
+    'aurora-postgresql':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '9.6.3'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql9.6'
+
+      ParameterGroupFamily: 'aurora-postgresql9.6'
+
+    'aurora-postgresql-9.6.12':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '9.6.12'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql9.6'
+
+      ParameterGroupFamily: 'aurora-postgresql9.6'
+
+    'aurora-postgresql-10.4':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '10.4'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql10'
+
+      ParameterGroupFamily: 'aurora-postgresql10'
+
+    'aurora-postgresql-10.5':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '10.5'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql10'
+
+      ParameterGroupFamily: 'aurora-postgresql10'
+
+    'aurora-postgresql-10.6':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '10.6'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql10'
+
+      ParameterGroupFamily: 'aurora-postgresql10'
+
+    'aurora-postgresql-10.7':
+
+      Engine: 'aurora-postgresql'
+
+      EngineVersion: '10.7'
+
+      Port: 5432
+
+      ClusterParameterGroupFamily: 'aurora-postgresql10'
+
+      ParameterGroupFamily: 'aurora-postgresql10'
+
+Conditions:
+
+  HasKmsKey: !Not [!Equals [!Ref ParentKmsKeyStack, '']]
+
+  HasZone: !Not [!Equals [!Ref ParentZoneStack, '']]
+
+  HasSSHBastionSecurityGroup: !Not [!Equals [!Ref ParentSSHBastionStack, '']]
+
+  HasAlertTopic: !Not [!Equals [!Ref ParentAlertStack, '']]
+
+  HasDBSnapshotIdentifier: !Not [!Equals [!Ref DBSnapshotIdentifier, '']]
+
+  HasKmsKeyAndNotDBSnapshotIdentifier: !And [!Condition HasKmsKey, !Not [!Condition HasDBSnapshotIdentifier]]
+
+  HasEngineMySQL: !Or [!Equals [!FindInMap [EngineMap, !Ref Engine, Engine], 'aurora'], !Equals [!FindInMap [EngineMap, !Ref Engine, Engine], 'aurora-mysql']]
+
+Resources:
+
+  RecordSet:
+
+    Condition: HasZone
+
+    Type: 'AWS::Route53::RecordSet'
+
+    Properties:
+
+      HostedZoneId: {'Fn::ImportValue': !Sub '${ParentZoneStack}-HostedZoneId'}
+
+      Name: !Sub
+
+      - '${SubDomainNameWithDot}${HostedZoneName}'
+
+      - SubDomainNameWithDot: !Ref SubDomainNameWithDot
